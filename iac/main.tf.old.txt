@@ -1,0 +1,174 @@
+#module to deploy Resource Group
+module "resource_group" {
+  providers = {
+    azurerm.adsprint = azurerm.adsprint
+  }
+  source              = "./modules/resource_group"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags = var.tags
+}
+#module to depploy VNET
+module "vnet" {
+  providers = {
+    azurerm.adsprint = azurerm.adsprint
+  }
+  source              = "./modules/vnet"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  create_rg           = var.create_rg
+  vnet_name           = var.vnet_name
+  address_space       = var.address_space
+  subnets             = var.subnets
+  tags                = var.tags
+
+  
+depends_on = [ module.resource_group ]
+ 
+}
+
+
+#deploy Windows VM
+/*module "vm_win" {
+   providers = {
+    azurerm.adsprint = azurerm.adsprint
+  }
+  source              = "./modules/vm_win"
+  vms                 = var.vms
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  admin_username      = var.admin_username
+  admin_password      = var.admin_password
+  subnet_ids          = module.vnet.subnet_ids
+  tags                = var.tags
+  vnet_dependency     = module.vnet.vnet_id
+  depends_on = [ module.resource_group,module.vnet ]
+}*/
+
+
+#Deploy BLOB storage
+module "storage" {
+  providers = {
+    azurerm.adsprint = azurerm.adsprint
+  }
+  source = "./modules/storage"
+  storage_account_name      = var.storage_account_name
+  resource_group_name       = var.resource_group_name
+  location                  = var.location
+  account_tier              = var.account_tier
+  replication_type  = var.replication_type
+  subnet_id = module.vnet.subnet_ids["pe_subnet"]
+  private_dns_zone_id = data.azurerm_private_dns_zone.acr_dns.id
+  tags                      = var.tags
+  depends_on = [ module.resource_group, module.vnet]
+  shared_access_key_enabled = var.shared_access_key_enabled
+}
+
+#Deploy Azure AI resources
+module "ai" {
+  providers = {
+    azurerm.adsprint = azurerm.adsprint
+  }
+  source = "./modules/AZ-AI-Resources"
+  location = var.location
+  resource_group_name = var.resource_group_name
+  cognitive_account_name = var.cognitive_account_name
+  azure_ai_instance_name = var.azure_ai_instance_name
+  sku_ai = var.sku_ai
+  depends_on = [ module.resource_group ]
+}
+
+#Deploy KeyVault
+module "kvm" {
+  providers = {
+    azurerm.adsprint = azurerm.adsprint
+}
+source = "./modules/keyvault"
+object_id = var.object_id
+location = var.location
+resource_group_name = var.resource_group_name
+keyvault_name = var.keyvault_name
+tenant_id = var.tenant_id
+depends_on = [ module.resource_group ]
+}
+
+########Data source to get private DNS zone ID from another subscription#############
+data "azurerm_private_dns_zone" "acr_dns" {
+ provider = azurerm.it-sharedservices-001
+  name                = "privatelink.azurecr.io"
+  resource_group_name = "rg-dns-prod-001"
+}
+data "azurerm_private_dns_zone" "blob_dns" {
+ provider = azurerm.it-sharedservices-001
+  name                = "privatelink.blob.core.windows.net"
+  resource_group_name = "rg-dns-prod-001"
+}
+data "azurerm_private_dns_zone" "sql_dns" {
+ provider = azurerm.it-sharedservices-001
+  name                = "privatelink.database.windows.net"
+  resource_group_name = "rg-dns-prod-001"
+}
+########################### ACR ################
+module "acr" {
+providers = {
+  azurerm.adsprint = azurerm.adsprint
+}
+  source = "./modules/acr"
+  acr_name            = var.acr_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  sku                 = var.sku
+  admin_enabled       = false
+  subnet_id           = module.vnet.subnet_ids["pe_subnet"]   
+  private_dns_zone_id = data.azurerm_private_dns_zone.acr_dns.id
+  tags                = var.tags
+   depends_on = [module.vnet]
+}
+/*################################## APPG ###############################
+# --- Get Existing VNet ---
+data "azurerm_virtual_network" "existing_vnet" {
+  provider            = azurerm.it-dmz-prod-001
+  name                = var.appg_vnet_name
+  resource_group_name = var.vnet_resource_group_name
+}
+module "appgw" {
+  source = "./modules/app-gateway"
+
+  providers = {
+    azurerm.it-dmz-prod-001 = azurerm.it-dmz-prod-001
+  }
+  appgw_name                = var.appgw_name
+  appg_resource_group_name       = var.appg_resource_group_name
+  location                  = var.location
+  appg_vnet_name                 = data.azurerm_virtual_network.existing_vnet.name
+  vnet_resource_group_name  = data.azurerm_virtual_network.existing_vnet.resource_group_name
+  appgw_subnet_name         = var.appgw_subnet_name
+  appgw_subnet_prefix       = var.appgw_subnet_prefix
+
+  appgw_sku_name            = var.appgw_sku_name
+  appgw_sku_tier            = var.appgw_sku_tier
+  appgw_capacity            = var.appgw_capacity
+
+  tags = var.tags
+}*/
+
+######################### MS SQL DB #########################
+module "sql_server" {
+  providers = {
+    azurerm.adsprint = azurerm.adsprint
+  }
+  source                  = "./modules/sql-server"
+  sql_server_name         = var.sql_server_name
+  resource_group_name     = var.resource_group_name
+  location                = var.location
+  sql_version             = var.sql_version
+  admin_login             = var.admin_login
+  sql_admin_password      = var.sql_admin_password
+  azuread_admin_username  = var.azuread_admin_username
+  subnet_id           = module.vnet.subnet_ids["pe_subnet"]
+  private_dns_zone_id = data.azurerm_private_dns_zone.sql_dns.id
+  azuread_admin_object_id = var.azuread_admin_object_id
+  db_name = var.db_name
+  collation = var.collation
+  depends_on = [module.vnet,module.resource_group]
+}
