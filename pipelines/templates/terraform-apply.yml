@@ -1,0 +1,36 @@
+jobs:
+  - job: terraform_apply
+    steps:
+      - task: TerraformInstaller@1
+        displayName: "install"
+        inputs:
+          terraformVersion: "latest"
+      - task: TerraformTaskV4@4
+        displayName: "init"
+        inputs:
+          provider: "azurerm"
+          command: "init"
+          backendServiceArm: "${{ parameters.backendServiceArm }}"
+          backendAzureRmSubscriptionId: "${{ parameters.backendAzureRmSubscriptionId }}"
+          backendAzureRmResourceGroupName: "${{ parameters.backendAzureRmResourceGroupName }}"
+          backendAzureRmStorageAccountName: "${{ parameters.backendAzureRmStorageAccountName }}"
+          backendAzureRmContainerName: "${{ parameters.backendAzureRmContainerName }}"
+          backendAzureRmKey: "${{ parameters.backendAzureRmKey }}"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.rootFolder }}"
+      - task: TerraformTaskV4@4
+        displayName: "plan"
+        inputs:
+          provider: "azurerm"
+          command: "plan"
+          # commandOptions: '-lock=false -input=false -var-file="../iac/${{ parameters.environment }}"'
+          commandOptions: -lock=false -input=false -var-file="../${{ parameters.rootFolder }}/${{ parameters.tfvars }}"
+          environmentServiceNameAzureRM: "${{ parameters.backendServiceArm }}"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.rootFolder }}"
+      - task: TerraformTaskV4@4
+        displayName: "apply"
+        inputs:
+          provider: "azurerm"
+          command: "apply"
+          commandOptions: -lock=false -input=false -auto-approve -var-file="../${{ parameters.rootFolder }}/${{ parameters.tfvars }}"
+          environmentServiceNameAzureRM: "${{ parameters.backendServiceArm }}"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.rootFolder }}"

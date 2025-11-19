@@ -1,0 +1,28 @@
+jobs:
+  - job: terraform_plan
+    steps:
+      - task: TerraformInstaller@1
+        displayName: "install"
+        inputs:
+          terraformVersion: "latest"
+      - task: TerraformTaskV4@4
+        displayName: "init"
+        inputs:
+          provider: "azurerm"
+          command: "init"
+          backendServiceArm: "${{ parameters.backendServiceArm }}"
+          backendAzureRmSubscriptionId: ${{ parameters.backendAzureRmSubscriptionId }}
+          backendAzureRmResourceGroupName: "${{ parameters.backendAzureRmResourceGroupName }}"
+          backendAzureRmStorageAccountName: "${{ parameters.backendAzureRmStorageAccountName }}"
+          backendAzureRmContainerName: "${{ parameters.backendAzureRmContainerName }}"
+          backendAzureRmKey: "${{ parameters.backendAzureRmKey }}"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.rootFolder }}"
+          commandOptions: '-reconfigure'
+      - task: TerraformTaskV4@4
+        displayName: "plan"
+        inputs:
+          provider: "azurerm"
+          command: "plan"
+          commandOptions: -lock=false -input=false -var-file="$(System.DefaultWorkingDirectory)/${{ parameters.rootFolder }}/${{ parameters.tfvars }}"
+          environmentServiceNameAzureRM: "${{ parameters.backendServiceArm }}"
+          workingDirectory: "$(System.DefaultWorkingDirectory)/${{ parameters.rootFolder }}"

@@ -1,0 +1,89 @@
+name: $(BuildDefinitionName)_$(date:yyyyMMdd)$(rev:.r)
+
+trigger: none
+
+pr: none
+
+variables:
+  # Variable group containing development environment settings
+  - group: fortreaiac-phase1
+  - name: tfvars
+    value: "adsprintdeveastus.tfvars" # Terraform variables file
+  - name: rootFolder
+    value: "iac" # Root folder for IaC files
+
+parameters:
+  - name: tf_plan
+    type: boolean
+    default: False
+  - name: tf_apply
+    type: boolean
+    default: False
+  - name: tf_destroy
+    type: boolean
+    default: False
+  
+
+pool:
+  name: "Fortrea-IAC"
+  demands:
+    - agent.name -equals iacagent1
+
+stages:
+  - stage: terraform_validate
+    jobs:
+      - template: templates/terraform-validate.yml
+        parameters:
+          backendServiceArm: $(backendServiceArm)
+          backendAzureRmSubscriptionId: $(backendAzureRmSubscriptionId)
+          backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
+          backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
+          backendAzureRmContainerName: $(backendAzureRmContainerName)
+          backendAzureRmKey: $(backendAzureRmKey)
+          rootFolder: ${{ variables.rootFolder }}
+
+  - stage: terraform_plan
+    dependsOn: [terraform_validate]
+    condition: and(succeeded(), ${{ eq(parameters.tf_plan , True) }})
+    jobs:
+      - template: templates/terraform-plan.yml
+        parameters:
+          backendServiceArm: $(backendServiceArm)
+          backendAzureRmSubscriptionId: $(backendAzureRmSubscriptionId)
+          backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
+          backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
+          backendAzureRmContainerName: $(backendAzureRmContainerName)
+          backendAzureRmKey: $(backendAzureRmKey)
+          rootFolder: ${{ variables.rootFolder }}
+          tfvars: ${{ variables.tfvars }}
+     
+  - stage: terraform_apply
+    #dependsOn: [terraform_plan]
+    #condition: and(succeeded(), ${{ eq(parameters.tf_apply , True) }})
+    condition: eq(${{ parameters.tf_apply }}, True)
+
+    jobs:
+      - template: templates/terraform-apply.yml
+        parameters:
+          backendServiceArm: $(backendServiceArm)
+          backendAzureRmSubscriptionId: $(backendAzureRmSubscriptionId)
+          backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
+          backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
+          backendAzureRmContainerName: $(backendAzureRmContainerName)
+          backendAzureRmKey: $(backendAzureRmKey)
+          rootFolder: ${{ variables.rootFolder }}
+          tfvars: ${{ variables.tfvars }}
+
+  - stage: terraform_destroy
+    condition: eq(${{ parameters.tf_destroy }}, True)
+    jobs:
+      - template: templates/terraform-destroy.yml
+        parameters:
+          backendServiceArm: $(backendServiceArm)
+          backendAzureRmSubscriptionId: $(backendAzureRmSubscriptionId)
+          backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
+          backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
+          backendAzureRmContainerName: $(backendAzureRmContainerName)
+          backendAzureRmKey: $(backendAzureRmKey)
+          rootFolder: ${{ variables.rootFolder }}
+          tfvars: ${{ variables.tfvars }}
